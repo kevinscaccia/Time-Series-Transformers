@@ -157,3 +157,20 @@ class PositionalEncoder(nn.Module):
         x = x + self.pe[:x.size(self.x_dim)]
 
         return self.dropout(x)
+
+
+def plot_predictions(real_serie, pred_y):
+    plt.figure(figsize=(18,5))
+    plt.plot(real_serie, 'g', label='Real')
+    plt.plot(pred_y, 'r', label='Prediction')
+    plt.legend()
+    plt.show()
+
+def plot_serie(serie):
+    plt.figure(figsize=(10, 6))
+    plt.plot(serie, label='Time Serie', color='green')
+    plt.xlabel('Time')
+    plt.ylabel('Values')
+    plt.legend()
+    plt.grid(True)
+    plt.show()

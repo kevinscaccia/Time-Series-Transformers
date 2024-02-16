@@ -47,7 +47,7 @@ class TimeSeriesTransformer(nn.Module):
                             batch_first=True
                             )
         self.decoder_block = nn.TransformerDecoder(decoder_layer=decoder_layer,num_layers=self.decoder_nlayers, norm=None)
-        self.decoder_dense_mapping = nn.Linear(self.d_model, self.in_features, bias=False)
+        self.decoder_dense_mapping = nn.Linear(self.d_model, self.in_features)
         self.init_weights()
     
     def get_train_masks(self,):
