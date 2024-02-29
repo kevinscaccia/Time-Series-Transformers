@@ -1,12 +1,14 @@
-# tensorflow[and-cuda]
-scikit-learn
-pandas
 pyarrow
 tqdm
-transformers
-datasets 
-evaluate 
-accelerate 
-gluonts 
-ujson
+pandas
 matplotlib
+scikit-learn
+#
+pytorch
+transformers
+# datasets 
+# evaluate 
+# accelerate 
+# gluonts 
+# ujson
+# matplotlib

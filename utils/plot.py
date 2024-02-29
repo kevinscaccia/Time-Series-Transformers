@@ -18,14 +18,7 @@ def print_losses(losses, offset=0):
     plt.grid(True)
     plt.show()
 
-def create_chunks(serie, chunk_size):
-    # sliding window
-    chunks = []
-    i = 0
-    while (i+chunk_size) <= len(serie):
-        chunks.append(serie[i:i+chunk_size])
-        i += 1
-    return np.asarray(chunks)
+
 
 def generate_square_subsequent_mask(dim1: int, dim2: int) -> Tensor:
     """
@@ -42,37 +35,6 @@ def generate_square_subsequent_mask(dim1: int, dim2: int) -> Tensor:
         A Tensor of shape [dim1, dim2]
     """
     return torch.triu(torch.ones(dim1, dim2) * float('-inf'), diagonal=1)
-
-def generate_serie(num_points, amplitude=1, frequency=1, plot=False):
-    # Generate time series data
-    time = np.linspace(0, 10, num_points)  # Adjust the range if needed
-    data = amplitude * np.sin(2 * np.pi * frequency * time) 
-    if plot:
-        plt.figure(figsize=(10, 6))
-        plt.plot(time, data, label='Sinusoidal Time Series', color='green')
-        plt.title('Sinusoidal Time Series')
-        plt.xlabel('Time')
-        plt.ylabel('Value')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-    return torch.tensor(data, dtype=torch.float32)
-
-def generate_serie_2(num_points, noise=True, plot=False):
-    time = np.arange(0, num_points, 0.1)    
-    data   = np.sin(time) + np.sin(time * 0.05)  
-    if noise:
-        data = data + np.sin(time * 0.12) * np.random.normal(-0.2, 0.2, len(time))
-    if plot:
-        plt.figure(figsize=(10, 6))
-        plt.plot(time, data, label='Sinusoidal Time Series', color='green')
-        plt.title('Sinusoidal Time Series')
-        plt.xlabel('Time')
-        plt.ylabel('Value')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-    return torch.tensor(data, dtype=torch.float32) 
 
 
 #
@@ -174,3 +136,5 @@ def plot_serie(serie):
     plt.legend()
     plt.grid(True)
     plt.show()
+
+    
