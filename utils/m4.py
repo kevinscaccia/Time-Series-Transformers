@@ -251,3 +251,203 @@ def mase(insample, y_test, y_hat_test, freq):
     masep = np.mean(abs(insample[freq:] - y_hat_naive))
 
     return np.mean(abs(y_test - y_hat_test)) / masep
+
+
+
+
+forecast_horizon = {
+        'Hourly':48,
+        'Daily':14,
+        'Weekly':13,
+        'Monthly':18,
+        'Quarterly':8,
+        'Yearly':6,
+    }
+frequency = {
+        'Hourly':24,
+        'Daily':1,
+        'Weekly':1,
+        'Monthly':12,
+        'Quarterly':4,
+        'Yearly':1,
+    }
+def load_m4_data(freq=['Hourly','Daily','Weekly','Monthly','Quarterly','Yearly']):
+    df_info = pd.read_csv('./M4-methods/Dataset/M4-info.csv')
+    data_dict = {}
+    for SP in freq:
+        train = pd.read_csv(f'M4-methods/Dataset/Train/{SP}-train.csv')
+        test =  pd.read_csv(f'M4-methods/Dataset/Test/{SP}-test.csv')
+        data_dict[SP] = {
+            'train': train,
+            'test': test,
+            'SP': SP,
+            'freq': frequency[SP],
+            'fh': forecast_horizon[SP],
+            'num': len(train)
+        }
+    df_info = df_info[df_info['SP'].isin(freq)]
+    return data_dict, df_info
+
+class M4DatasetGenerator():
+    def __init__(self, freq=['Hourly','Daily','Weekly','Monthly','Quarterly','Yearly']):
+        print('Loading M4 Data...')
+        self.data_dict, self.df_info = load_m4_data(freq)
+        print('Loaded:')
+        for SP in freq:
+            print(f"    => {SP} has {self.data_dict[SP]['num']} series")
+    
+    def generate(self, n_series=None, random=False, seed=7, verbose=False):
+        np.random.seed(seed)
+        df_info, data_dict = self.df_info, self.data_dict
+        if n_series is None:
+            n_series = len(df_info)
+        if random:
+            idx = np.random.randint(low=0, high=len(df_info), size=n_series)
+        else:
+            idx = range(n_series)
+        if verbose: print(f'Generating {len(idx)} series..')
+
+        for serie_index in idx:
+            serie_info = df_info.iloc[serie_index]
+            serie_id = serie_info.M4id
+            serie_sp = serie_info.SP
+            fh = data_dict[serie_sp]['fh']
+            freq = data_dict[serie_sp]['freq']
+            train_df = data_dict[serie_sp]['train']
+            test_df = data_dict[serie_sp]['test']
+            # the V1 column is the name of the serie
+            train_serie = train_df[train_df.V1 == serie_id].dropna(axis=1).values.reshape(-1)[1:]
+            test_serie = test_df[test_df.V1 == serie_id].dropna(axis=1).values.reshape(-1)[1:]
+            test_serie = test_serie[:fh] # forecast only fh steps
+            train_serie = np.asarray(train_serie, dtype=np.float32)
+            test_serie = np.asarray(test_serie, dtype=np.float32)
+            yield train_serie, test_serie, serie_id, fh, freq, serie_sp
+        
+
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from utils.ml import make_batches, TransformerDataset
+import torch
+
+class MultiSerieGenerator():
+    def __init__(self, freq, input_len, forecast_horizon, device, verbose=False):
+        self.input_len = input_len
+        self.forecast_horizon = forecast_horizon
+        self.device = device
+        self.verbose = verbose
+        if verbose: print('Loading M4 Data...')
+        self.data_dict, self.df_info = load_m4_data(freq)
+        if verbose: print('Loaded:')
+        for SP in freq:print(f"    => {SP} has {self.data_dict[SP]['num']} series")
+    
+    def get_batches(self, n_series=None, random=False, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+        df_info, data_dict = self.df_info, self.data_dict
+        if n_series is None:
+            n_series = len(df_info)
+        if random:
+            idx = np.random.randint(low=0, high=len(df_info), size=n_series)
+        else:
+            idx = range(n_series)
+        if self.verbose: print(f'Generating {len(idx)} series..')
+        # faz o scalind individual das series completas
+        scaler = MinMaxScaler((-1, 1))
+        all_enc_x, all_dec_x, all_tgt_y  = [], [], []
+        for serie_index in idx:
+            serie_info = df_info.iloc[serie_index]
+            serie_id = serie_info.M4id
+            if self.verbose: print(serie_id, end=', ')
+            serie_sp = serie_info.SP
+            train_df = data_dict[serie_sp]['train']
+            
+            # the V1 column is the name of the serie
+            train_serie = train_df[train_df.V1 == serie_id].dropna(axis=1).values.reshape(-1)[1:]
+            train_serie = scaler.fit_transform(np.asarray(train_serie, dtype=np.float32).reshape(-1, 1)).reshape(-1)
+            #
+            enc_x, dec_x, tgt_y = make_batches(train_serie, self.input_len, self.forecast_horizon)
+            all_enc_x.append(enc_x)
+            all_dec_x.append(dec_x)
+            all_tgt_y.append(tgt_y)
+        # stack
+        all_enc_x = torch.vstack(all_enc_x)
+        all_dec_x = torch.vstack(all_dec_x)
+        all_tgt_y = torch.vstack(all_tgt_y)
+        # shuffle
+        all_enc_x = all_enc_x.to(self.device)
+        all_dec_x = all_dec_x.to(self.device)
+        all_tgt_y = all_tgt_y.to(self.device)
+        if self.verbose: print(f'Generated {len(all_enc_x)} batches from {len(idx)} series-> shape {all_enc_x.shape}')
+
+        return TransformerDataset(all_enc_x, all_dec_x, all_tgt_y)
+
+
+
+    
+def get_error_dict(freq=['Hourly','Daily','Weekly','Monthly','Quarterly','Yearly']):
+    return {p:{'sMAPE':[],'MASE':[]} for p in freq}
+
+class MultiSerieGenerator():
+    def __init__(self, freq, device, verbose=False):
+        self.device = device
+        self.verbose = verbose
+        if verbose: print('Loading M4 Data...')
+        self.data_dict, self.df_info = load_m4_data(freq)
+        if verbose: print('Loaded:')
+        for SP in freq:print(f"    => {SP} has {self.data_dict[SP]['num']} series")
+    
+    def get_batches(self, block_size, n_series=None, random=False, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+        df_info, data_dict = self.df_info, self.data_dict
+        if n_series is None:
+            n_series = len(df_info)
+        else:
+            n_series = min(n_series, len(df_info))
+        #
+        if random:
+            idx = np.random.randint(low=0, high=len(df_info), size=n_series)
+        else:
+            idx = range(n_series)
+        if self.verbose: print(f'Generating {len(idx)} series..')
+        # faz o scalind individual das series completas
+        scaler = MinMaxScaler((-1, 1))
+        batch_x, batch_y, batch_masks = [], [], []
+        for serie_index in idx:
+            
+            serie_info = df_info.iloc[serie_index]
+            serie_id = serie_info.M4id
+            if self.verbose: print(serie_id, end=', ')
+            serie_sp = serie_info.SP
+            train_df = data_dict[serie_sp]['train']
+            
+            # the V1 column is the name of the serie
+            train_serie = train_df[train_df.V1 == serie_id].dropna(axis=1).values.reshape(-1)[1:]
+            #
+            train_serie = scaler.fit_transform(np.asarray(train_serie, dtype=np.float32).reshape(-1, 1)).reshape(-1)
+            train_serie = torch.tensor(train_serie, dtype=torch.float32)
+            x, y, x_pad = get_x_y(train_serie, block_size=block_size)
+            batch_x.append(x), batch_y.append(y), batch_masks.append(x_pad)
+        #
+        batch_x = torch.vstack(batch_x).unsqueeze(-1).to(self.device)
+        batch_y = torch.vstack(batch_y).unsqueeze(-1).to(self.device)
+        batch_masks = torch.vstack(batch_masks).to(self.device)
+
+        return batch_x, batch_y, batch_masks#TransformerDataset(all_enc_x, all_dec_x, all_tgt_y)
+
+PAD = -20
+def get_x_y(data, block_size):
+    if len(data) > block_size:
+        idx_start = torch.arange(0, len(data)-block_size)
+        # idx_start = torch.randint(len(data)-block_size, (batch_size,))
+        x = torch.stack([data[i:i+block_size] for i in idx_start])
+        y = torch.stack([data[i+1:i+block_size+1] for i in idx_start])
+        x_pad = (x == PAD)
+        return x, y, x_pad
+    else: # need to pad
+        x = np.pad(data, (0, block_size-len(data)), constant_values=PAD).reshape(1, -1)# batch
+        # y = data[1:].reshape(1, -1)# batch
+        y = np.pad(data[1:], (0, block_size-len(data[1:])), constant_values=PAD).reshape(1, -1)# batch
+        x_pad = (x == PAD)
+        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(x_pad, dtype=torch.float32)
+#

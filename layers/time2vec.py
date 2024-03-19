@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-
 """
     From https://github.com/QData/spacetimeformer/blob/main/spacetimeformer/time2vec.py
 """

@@ -6,6 +6,7 @@ scikit-learn
 #
 pytorch
 transformers
+mflow
 # datasets 
 # evaluate 
 # accelerate 

@@ -121,12 +121,38 @@ class PositionalEncoder(nn.Module):
         return self.dropout(x)
 
 
-def plot_predictions(real_serie, pred_y):
-    plt.figure(figsize=(18,5))
-    plt.plot(real_serie, 'g', label='Real')
-    plt.plot(pred_y, 'r', label='Prediction')
-    plt.legend()
-    plt.show()
+
+import plotly.graph_objects as go
+THEME = 'plotly_dark'
+def plot_predictions(history, real_serie, pred_y):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=np.arange(0, len(history)), y=history, mode='lines', 
+                              name=f'History', line=dict(color='#0099ff'), hovertemplate='$%{y:.2f}')) # past values
+    
+    fig.add_trace(go.Scatter(x=np.arange(len(history), len(history)+len(real_serie)), y=real_serie, mode='lines', 
+                              name=f'Future', line=dict(color='yellow'), hovertemplate='$%{y:.2f}')) # real future
+    
+    fig.add_trace(go.Scatter(x=np.arange(len(history), len(history)+len(pred_y)), y=pred_y, mode='lines', 
+                            name='Forecasted', line=dict(color='red'), hovertemplate='$%{y:.2f}')) # predicted 
+    
+    # Layout and configurations
+    config = {
+        'template':THEME,
+        'hovermode':'x unified',
+        'xaxis_rangeselector_font_color':'black',
+        'legend':dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=0.9),
+        }
+    fig.update_layout(config)
+    fig.layout.yaxis.fixedrange = True # block vertical zoom
+    fig.show()
+
+
+# def plot_predictions(real_serie, pred_y):
+#     plt.figure(figsize=(18,5))
+#     plt.plot(real_serie, 'g', label='Real')
+#     plt.plot(pred_y, 'r', label='Prediction')
+#     plt.legend()
+#     plt.show()
 
 def plot_serie(serie):
     plt.figure(figsize=(10, 6))
@@ -135,6 +161,13 @@ def plot_serie(serie):
     plt.ylabel('Values')
     plt.legend()
     plt.grid(True)
+    plt.show()
+
+def plot_train_history(train_l, val_l=None, offset=0,):
+    plt.plot(np.arange(offset+1,len(train_l)+1),train_l[offset:],'r', label='Train')
+    if val_l is not None:
+        plt.plot(np.arange(offset+1,len(train_l)+1),val_l[offset:],'b', label='Validation')
+    plt.legend()
     plt.show()
 
     
