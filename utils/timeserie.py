@@ -14,10 +14,10 @@ def split_sequence(sequence, n_steps):
     return np.asarray(x), np.asarray(y)
 
 # Função para gerar uma série temporal aleatória com tendência, ruído e sazonalidade
-def generate_time_series(length=100, trend_strength=0.0, seasonal_strength=0.0, noise_strength=1.0):
+def generate_time_series(length=100, trend_strength=0.0, seasonal_strength=0.0, noise_strength=1.0, scale_fac=2):
     time = np.arange(length)
     trend = trend_strength * time / length
-    seasonal = seasonal_strength * np.sin(2 * np.pi * time / 12)
+    seasonal = seasonal_strength * np.sin((scale_fac) * np.pi * time / 12)
     noise = noise_strength * np.random.randn(length)
     series = trend + seasonal + noise
     return series

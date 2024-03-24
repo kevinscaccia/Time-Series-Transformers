@@ -11,7 +11,6 @@ from utils.plot import plot_train_history, plot_predictions
 from utils.m4 import deseasonalize, detrend, smape
 # Transformers
 from utils.ml import make_batches
-from utils.plot import generate_square_subsequent_mask
 #
 class Experiment():
 

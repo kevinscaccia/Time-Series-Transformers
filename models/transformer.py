@@ -3,10 +3,27 @@ import torch
 from torch import nn
 import math
 import time
-from utils.plot import generate_square_subsequent_mask
 from torch.utils.data import DataLoader
 #
 # from layers import PositionalEncoding
+
+import torch
+def generate_square_subsequent_mask(dim1: int, dim2: int) -> torch.Tensor:
+    """
+    Generates an upper-triangular matrix of -inf, with zeros on diag.
+    Source:
+    https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+    Args:
+        dim1: int, for both src and tgt masking, this must be target sequence
+              length
+        dim2: int, for src masking this must be encoder sequence length (i.e. 
+              the length of the input sequence to the model), 
+              and for tgt masking, this must be target sequence length 
+    Return:
+        A Tensor of shape [dim1, dim2]
+    """
+    return torch.triu(torch.ones(dim1, dim2) * float('-inf'), diagonal=1)
+
 
 class TimeSeriesTransformer(nn.Module):
     def __init__(self, model_params: dict):
@@ -187,7 +204,6 @@ import numpy as np
 import torch
 from torch import nn
 import math, time, tqdm
-from utils.plot import generate_square_subsequent_mask
 from torch.utils.data import DataLoader
 
 class DecoderOnlyTransformer(torch.nn.Module):
@@ -202,7 +218,8 @@ class DecoderOnlyTransformer(torch.nn.Module):
         self.train_loss_history = []
         self.validation_loss_history = []
 
-        self.pos_emb = nn.Embedding(num_embeddings=self.block_size, embedding_dim=self.d_model)
+        # self.pos_emb = nn.Embedding(num_embeddings=self.block_size, embedding_dim=self.d_model)
+        self.pos_enc = PositionalEncoding(self.d_model, dropout=0)
         self.decoder_embedding = torch.nn.Linear(in_features=1, out_features=self.d_model)
         self.output_layer = torch.nn.Linear(in_features=self.d_model, out_features=1)
         # self.scaler = nn.BatchNorm1d(num_features=self.block_size)
@@ -218,7 +235,9 @@ class DecoderOnlyTransformer(torch.nn.Module):
     def is_transformer(self, ): return True
 
     def forward(self, src: torch.Tensor, mask=None, pad_mask=None) -> torch.Tensor:
-        src = self.decoder_embedding(src) + self.pos_emb(torch.arange(src.shape[1]).to(self.device))# (B, T) --> (B, T, Emb) 
+        # src = self.decoder_embedding(src) + self.pos_emb(torch.arange(src.shape[1]).to(self.device))# (B, T) --> (B, T, Emb) 
+        src = self.pos_enc(self.decoder_embedding(src))
+        
         pred = self.decoder(src, mask=mask, src_key_padding_mask=pad_mask)
         pred = self.output_layer(pred)
         return pred
@@ -264,6 +283,8 @@ class DecoderOnlyTransformer(torch.nn.Module):
         validate_freq = conf.get('validate_freq',100)
         early_stop = conf.get('early_stop', None)
         epoch_offset = conf.get('epoch_offset', 0)
+        save = conf.get('save', False)
+
         #
         optimizer = torch.optim.AdamW(self.parameters(), lr=conf['lr'])
         loss_fn = nn.MSELoss(reduction='none')
@@ -277,7 +298,10 @@ class DecoderOnlyTransformer(torch.nn.Module):
             for enc_x, tgt_y, mask_x in train_loader:#tqdm.tqdm(train_loader):
                 enc_x, tgt_y, mask_x  = enc_x.to(self.device), tgt_y.to(self.device), mask_x.to(self.device)
                 optimizer.zero_grad() # current batch zero-out the loss
-                pred_y = self(enc_x, pad_mask=mask_x) # mask x is very very important!!!
+                
+                src_mask = nn.Transformer.generate_square_subsequent_mask(enc_x.shape[1]).to(self.device)
+                pred_y = self(enc_x, mask=src_mask, pad_mask=mask_x) # mask x is very very important!!!
+
                 loss = loss_fn(pred_y, tgt_y) # loss with padding
                 loss = loss.where((tgt_y != self.pad_token), torch.tensor(0.0)).mean() # mask pading in the loss!
                 loss.backward()
@@ -288,7 +312,8 @@ class DecoderOnlyTransformer(torch.nn.Module):
             self.train_loss_history.append(epoch_loss.to('cpu').detach().numpy())
             if early_stop is not None:
                 if early_stop.step(epoch_loss): break
-            torch.save(self, f'decoder_only_weekly_{epoch_i}.model')
+            if save: 
+                torch.save(self, f'decoder_only_weekly_{epoch_i}.model')
             to_validate = False#(val_dataset is not None) and (epoch_i % validate_freq == 0)
             if verbose:
                 if to_validate: 

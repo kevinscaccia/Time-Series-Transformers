@@ -434,20 +434,3 @@ class MultiSerieGenerator():
         batch_masks = torch.vstack(batch_masks).to(self.device)
 
         return batch_x, batch_y, batch_masks#TransformerDataset(all_enc_x, all_dec_x, all_tgt_y)
-
-PAD = -20
-def get_x_y(data, block_size):
-    if len(data) > block_size:
-        idx_start = torch.arange(0, len(data)-block_size)
-        # idx_start = torch.randint(len(data)-block_size, (batch_size,))
-        x = torch.stack([data[i:i+block_size] for i in idx_start])
-        y = torch.stack([data[i+1:i+block_size+1] for i in idx_start])
-        x_pad = (x == PAD)
-        return x, y, x_pad
-    else: # need to pad
-        x = np.pad(data, (0, block_size-len(data)), constant_values=PAD).reshape(1, -1)# batch
-        # y = data[1:].reshape(1, -1)# batch
-        y = np.pad(data[1:], (0, block_size-len(data[1:])), constant_values=PAD).reshape(1, -1)# batch
-        x_pad = (x == PAD)
-        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(x_pad, dtype=torch.float32)
-#
