@@ -253,8 +253,6 @@ def mase(insample, y_test, y_hat_test, freq):
     return np.mean(abs(y_test - y_hat_test)) / masep
 
 
-
-
 forecast_horizon = {
         'Hourly':48,
         'Daily':14,

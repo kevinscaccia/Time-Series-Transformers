@@ -6,7 +6,8 @@ scikit-learn
 #
 pytorch
 transformers
-mflow
+neuralforecast 
+datasetsforecast
 # datasets 
 # evaluate 
 # accelerate 

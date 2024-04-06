@@ -120,3 +120,6 @@ class EarlyStopper():
         self.last_loss = loss
         return False
 
+def print_num_weights(model):
+    n = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'Num of weights: {n}')
